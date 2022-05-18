@@ -1,131 +1,54 @@
-import * as crypto from 'crypto';
+const { createCipheriv, randomBytes, createDecipheriv } = require('crypto');
 
-// Transfer of funds between two wallets
-class Transaction {
-  constructor(
-    public amount: number, 
-    public payer: string, // public key
-    public payee: string // public key
-  ) {}
+import {personalInfo, visitInfo, Doctor} from './class_file'
 
-  toString() {
-    return JSON.stringify(this);
-  }
-}
+//patient 1
+const patient = new personalInfo("patient 1", 20, true, "0+", 80, 180, 50, 120, 60)
+console.log(typeof patient.toString()) //string
 
-// Individual block on the chain
-class Block {
+const patient_data = patient.toString()
+const blockchain_key = randomBytes(32)
+const blockchain_iv = randomBytes(16)
 
-  public nonce = Math.round(Math.random() * 999999999);
+// patient cipher 
 
-  constructor(
-    public prevHash: string, 
-    public transaction: Transaction, 
-    public ts = Date.now()
-  ) {}
+const patient_cipher = createCipheriv('aes256', blockchain_key, blockchain_iv)
 
-  get hash() {
-    const str = JSON.stringify(this);
-    const hash = crypto.createHash('SHA256');
-    hash.update(str).end();
-    return hash.digest('hex');
-  }
-}
+//patient encryption
+
+const encrypted_info = patient_cipher.update(patient_data, 'utf8', 'hex') + patient_cipher.final('hex')
+console.log(`Encrypted Patient data: ${encrypted_info}`)
+
+//decryption of data
+
+const decipher_function = createDecipheriv('aes256', blockchain_key, blockchain_iv)
+const decrypted_data = decipher_function.update(encrypted_info, 'hex', 'utf8') + decipher_function.final('utf8')
+console.log(`Dencrypted Patient data: ${decrypted_data}`)
+
+const patient_2 = new personalInfo()
+let temp = JSON.parse(decrypted_data)
+Object.assign(patient_2, temp);
+console.log(patient_2)
 
 
-// The blockchain
-class Chain {
-  // Singleton instance
-  public static instance = new Chain();
-
-  chain: Block[];
-
-  constructor() {
-    this.chain = [
-      // Genesis block
-      new Block('', new Transaction(100, 'genesis', 'satoshi'))
-    ];
-  }
-
-  // Most recent block
-  get lastBlock() {
-    return this.chain[this.chain.length - 1];
-  }
-
-  // Proof of work system
-  mine(nonce: number) {
-    let solution = 1;
-    console.log('⛏️  mining...')
-
-    while(true) {
-
-      const hash = crypto.createHash('MD5');
-      hash.update((nonce + solution).toString()).end();
-
-      const attempt = hash.digest('hex');
-
-      if(attempt.substr(0,4) === '0000'){
-        console.log(`Solved: ${solution}`);
-        return solution;
-      }
-
-      solution += 1;
-    }
-  }
-
-  // Add a new block to the chain if valid signature & proof of work is complete
-  addBlock(transaction: Transaction, senderPublicKey: string, signature: Buffer) {
-    const verify = crypto.createVerify('SHA256');
-    verify.update(transaction.toString());
-
-    const isValid = verify.verify(senderPublicKey, signature);
-
-    if (isValid) {
-      const newBlock = new Block(this.lastBlock.hash, transaction);
-      this.mine(newBlock.nonce);
-      this.chain.push(newBlock);
-    }
-  }
-
-}
-
-// Wallet gives a user a public/private keypair
-class Wallet {
-  public publicKey: string;
-  public privateKey: string;
-
-  constructor() {
-    const keypair = crypto.generateKeyPairSync('rsa', {
-      modulusLength: 2048,
-      publicKeyEncoding: { type: 'spki', format: 'pem' },
-      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
-    });
-
-    this.privateKey = keypair.privateKey;
-    this.publicKey = keypair.publicKey;
-  }
-
-  sendMoney(amount: number, payeePublicKey: string) {
-    const transaction = new Transaction(amount, this.publicKey, payeePublicKey);
-
-    const sign = crypto.createSign('SHA256');
-    sign.update(transaction.toString()).end();
-
-    const signature = sign.sign(this.privateKey); 
-    Chain.instance.addBlock(transaction, this.publicKey, signature);
-  }
-}
-
-// Example usage
-
-const satoshi = new Wallet();
-const bob = new Wallet();
-const alice = new Wallet();
-
-satoshi.sendMoney(50, bob.publicKey);
-bob.sendMoney(23, alice.publicKey);
-alice.sendMoney(5, bob.publicKey);
-
-console.log(Chain.instance)
 
 
+// const patient_2 = new personalInfo(temp)
+/// Cipher
+
+// const message = 'i like turtles';
+// const key = randomBytes(32);
+// const iv = randomBytes(16);
+
+// const cipher = createCipheriv('aes256', key, iv);
+
+// /// Encrypt
+
+// const encryptedMessage = cipher.update(message, 'utf8', 'hex') + cipher.final('hex');
+// console.log(`Encrypted: ${encryptedMessage}`);
+
+// /// Decrypt
+
+// const decipher = createDecipheriv('aes256', key, iv);
+// const decryptedMessage = decipher.update(encryptedMessage, 'hex', 'utf-8') + decipher.final('utf8');
+// console.log(`Deciphered: ${decryptedMessage.toString('utf-8')}`);
