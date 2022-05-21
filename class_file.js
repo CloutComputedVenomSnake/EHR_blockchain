@@ -23,7 +23,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.Doctor = exports.visitInfo = exports.personalInfo = void 0;
+exports.Transaction = exports.Doctor = exports.visitInfo = exports.personalInfo = void 0;
 const crypto = __importStar(require("crypto"));
 class personalInfo {
     constructor(name, age, gender, bloodType, weight, height, bloodPressure, pulse, oxygen) {
@@ -63,13 +63,61 @@ class visitInfo {
 }
 exports.visitInfo = visitInfo;
 class Doctor {
-    constructor(name, password, age) {
+    constructor(name, age, password = "password") {
         this.name = name;
-        this.password = password;
         this.age = age;
+        this.password = password;
+        const keypair = crypto.generateKeyPairSync('rsa', {
+            modulusLength: 2048,
+            publicKeyEncoding: { type: 'spki', format: 'pem' },
+            privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+        });
+        this.privateKey = keypair.privateKey;
+        this.publicKey = keypair.publicKey;
+    }
+    toString() {
+        return JSON.stringify(this);
+    }
+    sign(password, transaction) {
+        var signature = Buffer.alloc(0);
+        if (password === this.password) {
+            console.log("transaction signed succesfully");
+            const sign = crypto.createSign('SHA256');
+            sign.update(transaction.toString()).end();
+            signature = sign.sign(this.privateKey);
+            return signature;
+        }
+        else {
+            console.log("wrong password");
+            return signature;
+        }
+    }
+    verify_signiture(signature, transaction) {
+        //const signature_buffer = Buffer.from(signature, "utf-8");
+        const doctor_PK = this.publicKey;
+        const doctor_name = this.name;
+        const verify = crypto.createVerify('SHA256');
+        verify.update(transaction);
+        const isValid = verify.verify(doctor_PK, signature);
+        if (signature.length === 0) {
+            console.log("this is not a valid signature");
+        }
+        if (isValid) {
+            console.log(`doctor ${doctor_name} signed this visit`);
+        }
+        else {
+            console.log("this doctor did not sign this message");
+        }
+    }
+}
+exports.Doctor = Doctor;
+class Transaction {
+    constructor(transaction, signiture) {
+        this.transaction = transaction;
+        this.signiture = signiture;
     }
     toString() {
         return JSON.stringify(this);
     }
 }
-exports.Doctor = Doctor;
+exports.Transaction = Transaction;
