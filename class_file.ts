@@ -1,24 +1,39 @@
 import { Console } from 'console';
 import * as crypto from 'crypto';
 
+export enum gender{
+  male = "Male",
+  female = "Female"
+}
+
+export enum bloodType{
+  O = "O",
+  A = "A",
+  X = "X"
+}
+
 export class personalInfo {
+  
   constructor(
     public name?: string, 
     public age?: number,
-    public gender?: boolean,
-    public bloodType?: string,
+    public gender?: gender,
+    public bloodType?: bloodType,
     public weight?: number,
     public height?: number,
     public bloodPressure?: number,
     public pulse?: number,
     public oxygen?: number
-  ) {}
+  ) {  }
   
 
   toString() {
     return JSON.stringify(this);
   }
 }
+
+
+
 
 export class visitInfo {
 
@@ -52,7 +67,7 @@ export class Doctor{
   
 
   public publicKey: string;
-  public privateKey: string;
+  private privateKey: string;
 
   constructor(
     public name: string,
@@ -101,7 +116,7 @@ export class Doctor{
     if(signature.length === 0){
       console.log("this is not a valid signature")
     }
-    if (isValid) {
+    else if (isValid) {
       console.log(`doctor ${doctor_name} signed this visit`)
     }
     else{

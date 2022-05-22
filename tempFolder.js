@@ -24,8 +24,6 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const crypto = __importStar(require("crypto"));
-const readline = __importStar(require("node:readline"));
-const process_1 = require("process");
 // Transfer of funds between two wallets
 class Transaction {
     constructor(amount, payer, // public key
@@ -121,15 +119,3 @@ const alice = new Wallet();
 satoshi.sendMoney(50, bob.publicKey);
 bob.sendMoney(23, alice.publicKey);
 console.log(Chain.instance);
-const rl = readline.createInterface({
-    input: process_1.stdin,
-    output: process_1.stdout
-});
-rl.question("What is your name? \n", function (answer) {
-    console.log(`Oh, so your name is ${answer}`);
-    if (answer === "Alei") {
-        console.log("Closing the interface");
-    }
-    alice.sendMoney(5, bob.publicKey);
-    rl.close();
-});

@@ -132,16 +132,3 @@ bob.sendMoney(23, alice.publicKey);
 console.log(Chain.instance)
 
 
-const rl = readline.createInterface({
-  input: stdin,
-  output: stdout
-});
-
-rl.question("What is your name? \n", function (answer: string) {
-  console.log(`Oh, so your name is ${answer}`);
-  if(answer === "Alei"){
-    console.log("Closing the interface");
-  }
-  alice.sendMoney(5, bob.publicKey);
-  rl.close();
-});

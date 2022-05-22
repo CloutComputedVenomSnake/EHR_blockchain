@@ -23,8 +23,19 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.Transaction = exports.Doctor = exports.visitInfo = exports.personalInfo = void 0;
+exports.Transaction = exports.Doctor = exports.visitInfo = exports.personalInfo = exports.bloodType = exports.gender = void 0;
 const crypto = __importStar(require("crypto"));
+var gender;
+(function (gender) {
+    gender["male"] = "Male";
+    gender["female"] = "Female";
+})(gender = exports.gender || (exports.gender = {}));
+var bloodType;
+(function (bloodType) {
+    bloodType["O"] = "O";
+    bloodType["A"] = "A";
+    bloodType["X"] = "X";
+})(bloodType = exports.bloodType || (exports.bloodType = {}));
 class personalInfo {
     constructor(name, age, gender, bloodType, weight, height, bloodPressure, pulse, oxygen) {
         this.name = name;
@@ -102,7 +113,7 @@ class Doctor {
         if (signature.length === 0) {
             console.log("this is not a valid signature");
         }
-        if (isValid) {
+        else if (isValid) {
             console.log(`doctor ${doctor_name} signed this visit`);
         }
         else {
