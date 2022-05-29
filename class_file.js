@@ -23,7 +23,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.Transaction = exports.Doctor = exports.visitInfo = exports.personalInfo = exports.bloodType = exports.gender = void 0;
+exports.chain = exports.Block = exports.Transaction = exports.Doctor = exports.visitInfo = exports.personalInfo = exports.bloodType = exports.gender = void 0;
 const crypto = __importStar(require("crypto"));
 var gender;
 (function (gender) {
@@ -132,3 +132,42 @@ class Transaction {
     }
 }
 exports.Transaction = Transaction;
+class Block {
+    constructor(prevHash, transaction) {
+        this.prevHash = prevHash;
+        this.transaction = transaction;
+    }
+    toString() {
+        return JSON.stringify(this);
+    }
+    get hash() {
+        const str = JSON.stringify(this);
+        const hash = crypto.createHash('SHA256');
+        hash.update(str).end();
+        return hash.digest('hex');
+    }
+    get lastHash() {
+        return this.prevHash;
+    }
+    getTransaction(password) {
+        if (password === "password") {
+            return this.transaction;
+        }
+        return "you are not authorized";
+    }
+}
+exports.Block = Block;
+class chain {
+    constructor() {
+        this.blockchain = [new Block("0000", "Genesis Block")
+        ];
+    }
+    get lastBlock() {
+        return this.blockchain[this.blockchain.length - 1];
+    }
+    addBlock(Block) {
+        this.blockchain.push(Block);
+    }
+}
+exports.chain = chain;
+chain.instance = new chain();

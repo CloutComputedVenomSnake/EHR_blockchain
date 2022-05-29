@@ -124,6 +124,8 @@ export class Doctor{
     }
   }
 
+  
+
 }
 
 
@@ -139,5 +141,57 @@ export class Transaction{
   toString() {
     return JSON.stringify(this);
   }
+
+}
+
+export class Block{
+  constructor(
+    public prevHash:string,
+    private transaction: string,
+  ){}
+
+  toString() {
+    return JSON.stringify(this);
+  }
+
+  get hash(){
+    const str = JSON.stringify(this);
+    const hash = crypto.createHash('SHA256');
+    hash.update(str).end();
+    return hash.digest('hex');
+  }
+
+  get lastHash(){
+    return this.prevHash
+  }
+
+  getTransaction(password:string){
+    if(password === "password"){
+      return this.transaction
+    }
+    return "you are not authorized"
+  }
+
+}
+
+export class chain{
+  public static instance = new chain();
+  blockchain: Block[];
+
+  constructor(){
+    this.blockchain = [new Block("0000", "Genesis Block")
+  ]}
+
+  get lastBlock(){
+    return this.blockchain[this.blockchain.length - 1]
+  }
+
+  addBlock(Block:Block){
+    this.blockchain.push(Block);
+  }
+  
+
+
+
 
 }
