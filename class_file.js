@@ -22,9 +22,14 @@ var __importStar = (this && this.__importStar) || function (mod) {
     __setModuleDefault(result, mod);
     return result;
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.chain = exports.Block = exports.Transaction = exports.Doctor = exports.visitInfo = exports.personalInfo = exports.bloodType = exports.gender = void 0;
 const crypto = __importStar(require("crypto"));
+const { createCipheriv, randomBytes, createDecipheriv } = require('crypto');
+const fs_1 = __importDefault(require("fs"));
 var gender;
 (function (gender) {
     gender["male"] = "Male";
@@ -60,13 +65,6 @@ class visitInfo {
         this.doctorName = doctorName;
         this.reasonOfVisit = reasonOfVisit;
         this.prescription = prescription;
-        const keypair = crypto.generateKeyPairSync('rsa', {
-            modulusLength: 2048,
-            publicKeyEncoding: { type: 'spki', format: 'pem' },
-            privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
-        });
-        this.privateKey = keypair.privateKey;
-        this.publicKey = keypair.publicKey;
     }
     toString() {
         return JSON.stringify(this);
@@ -96,15 +94,16 @@ class Doctor {
             const sign = crypto.createSign('SHA256');
             sign.update(transaction.toString()).end();
             signature = sign.sign(this.privateKey);
-            return signature;
+            return signature.toString("hex");
         }
         else {
             console.log("wrong password");
-            return signature;
+            return signature.toString("hex");
         }
     }
-    verify_signiture(signature, transaction) {
+    verify_signiture(sign, transaction) {
         //const signature_buffer = Buffer.from(signature, "utf-8");
+        const signature = Buffer.from(sign, "hex");
         const doctor_PK = this.publicKey;
         const doctor_name = this.name;
         const verify = crypto.createVerify('SHA256');
@@ -149,25 +148,126 @@ class Block {
     get lastHash() {
         return this.prevHash;
     }
-    getTransaction(password) {
-        if (password === "password") {
-            return this.transaction;
-        }
-        return "you are not authorized";
+    getTransaction() {
+        return this.transaction;
+    }
+    encryptData(blockchain_key, blockchain_iv) {
+        console.log(this.transaction);
+        const patient_cipher = createCipheriv('aes256', chain.blockchain_key, chain.blockchain_iv);
+        var encrypted_info = patient_cipher.update(this.transaction, 'utf8', 'hex') + patient_cipher.final('hex');
+        this.transaction = encrypted_info;
+    }
+    decryptData(blockchain_key, blockchain_iv) {
+        const decipher_function = createDecipheriv('aes256', chain.blockchain_key, chain.blockchain_iv);
+        var decrypted_data = decipher_function.update(this.transaction, 'hex', 'utf8') + decipher_function.final('utf8');
+        this.transaction = decrypted_data;
     }
 }
 exports.Block = Block;
+let unSerializeChain = function () {
+    try {
+        let bufferedData = fs_1.default.readFileSync('./chain.json');
+        let dataString = bufferedData.toString();
+        let chainArray = JSON.parse(dataString);
+        return chainArray;
+    }
+    catch (error) {
+        return [];
+    }
+};
 class chain {
     constructor() {
-        this.blockchain = [new Block("0000", "Genesis Block")
-        ];
+        this.saved_key = chain.blockchain_key.toString();
+        this.saved_iv = chain.blockchain_iv.toString();
+        this.serializeChain = function (currChain) {
+            currChain.saved_key = chain.blockchain_key.toString('hex');
+            currChain.saved_iv = chain.blockchain_iv.toString('hex');
+            fs_1.default.writeFileSync('./chain.json', JSON.stringify(currChain));
+        };
+        let fileData = unSerializeChain();
+        console.log("Ran HERE");
+        if (Object.keys(fileData).length === 0) {
+            var block = new Block("0000", "Genesis Block");
+            block.encryptData(chain.blockchain_key, chain.blockchain_iv);
+            this.blockchain = [block];
+            this.saved_key = chain.blockchain_key.toString('hex');
+            this.saved_iv = chain.blockchain_iv.toString('hex');
+            this.serializeChain(this);
+        }
+        else {
+            chain.instance = fileData;
+            //Object.assign(chain.instance, temp);
+            // var buf = new Buffer.from(chain.instance.saved_key.toString())
+            var temp = chain.instance.blockchain;
+            this.blockchain = [];
+            for (var i = 0; i < chain.instance.blockchain.length; i++) {
+                this.blockchain.push(temp[i]);
+            }
+            chain.blockchain_key = Buffer.from(chain.instance.saved_key, "hex");
+            chain.blockchain_iv = Buffer.from(chain.instance.saved_iv, "hex");
+            console.log(chain.blockchain_key);
+        }
+    }
+    toString() {
+        return JSON.stringify(this);
     }
     get lastBlock() {
-        return this.blockchain[this.blockchain.length - 1];
+        const lastblock = new Block();
+        let temp = this.blockchain[this.blockchain.length - 1];
+        Object.assign(lastblock, temp);
+        return lastblock;
+    }
+    getBlock(pos) {
+        const currBlock = new Block();
+        let temp = this.blockchain[pos];
+        Object.assign(currBlock, temp);
+        // currBlock.decryptData(password, chain.blockchain_key, chain.blockchain_iv, chain.decipher_function)
+        currBlock.decryptData(chain.blockchain_key, chain.blockchain_iv);
+        console.log(currBlock);
+        return currBlock;
     }
     addBlock(Block) {
+        // Block.encryptData(password, chain.blockchain_key, chain.blockchain_iv, chain.patient_cipher)
+        Block.encryptData(chain.blockchain_key, chain.blockchain_iv);
         this.blockchain.push(Block);
+        this.serializeChain(this);
+    }
+    createBlock(transaction, doctor) {
+        const lastblock = chain.instance.lastBlock;
+        const signature = doctor.sign(doctor.password, transaction);
+        if (signature.length === 0) {
+            console.log("Creation Failed ::: Wrong Password Entered");
+        }
+        else {
+            const t = new Transaction(transaction, signature);
+            const block = new Block(lastblock.hash, t.toString());
+            this.addBlock(block);
+        }
+        // getBlock(pos:number, password:string){
+        //   const currBlock:Block = this.blockchain[pos]
+        //   // currBlock.decryptData(password, chain.blockchain_key, chain.blockchain_iv, chain.decipher_function)
+        //   currBlock.decryptData(chain.blockchain_key, chain.blockchain_iv)
+        //   return currBlock
+        // }
+        // addBlock(Block:Block, password:string){
+        //   // Block.encryptData(password, chain.blockchain_key, chain.blockchain_iv, chain.patient_cipher)
+        //   Block.encryptData(password, chain.blockchain_key, chain.blockchain_iv)
+        //   this.blockchain.push(Block);
+        // }
+        // createBlock(transaction:string, password:string, doctor:Doctor){
+        //   const lastblock = chain.instance.lastBlock
+        //   const signature = doctor.sign(password, transaction)
+        //   if(signature.length === 0){
+        //     console.log("Creation Failed ::: Wrong Password Entered")
+        //   }
+        //   else{
+        //     const t = new Transaction(transaction, signature)
+        //     const block = new Block(lastblock.hash, t.toString())
+        //     this.addBlock(block, password)
+        //   }
     }
 }
 exports.chain = chain;
+chain.blockchain_key = randomBytes(32);
+chain.blockchain_iv = randomBytes(16);
 chain.instance = new chain();

@@ -2,10 +2,11 @@
   "name": "blockchain",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "Blockchain.js",
   "scripts": {
     "dev": "tsc -w",
-    "start": "tsc && node ."
+    "start": "tsc && node .",
+    "test": "tsc && node test.ts"
   },
   "keywords": [],
   "author": "",
