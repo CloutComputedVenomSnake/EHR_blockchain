@@ -89,6 +89,10 @@ class Doctor {
     toString() {
         return JSON.stringify(this);
     }
+    stringForPrinting() {
+        return "{ \n" + "DoctorID: " + this.id + "\nName: " + this.name + "\nAge: " + this.age +
+            "\nDoctor Public Key: " + this.publicKey + "\n}";
+    }
     // sign(password:string, transaction:string){
     //   var signature:Buffer = Buffer.alloc(0)
     //   if(password === this.password){
@@ -113,13 +117,16 @@ class Doctor {
         // console.log("Used To Check:" + sign)
         const isValid = verify.verify(doctor_PK, signature);
         if (signature.length === 0) {
-            console.log("this is not a valid signature");
+            //console.log("this is not a valid signature")
+            return 0;
         }
         else if (isValid) {
-            console.log(`doctor ${doctor_name} signed this visit`);
+            //console.log(`doctor ${doctor_name} signed this visit`)
+            return 1;
         }
         else {
-            console.log("this doctor did not sign this message");
+            //console.log("this doctor did not sign this message")
+            return -1;
         }
     }
 }
@@ -266,15 +273,27 @@ class blockchain {
         this.addPatientBlock(docPrivateKey, newPatient);
     }
     addDoctor(name, age, password) {
+        for (let i = 0; i < this.doctors.length; i++) {
+            if (name === this.doctors[i].name) {
+                console.log("Doctor Already Exists");
+                return this.doctors[i];
+            }
+        }
         const curr_doctor = new Doctor(this.doctors.length, name, age, password);
         this.doctors.push(curr_doctor);
+        console.log(this.doctors);
         return curr_doctor;
     }
     findTransWithId(Id) {
         var _a, _b, _c, _d;
         var curr_block = this.lastBlock;
         while (!!curr_block) {
-            curr_block.decryptData(this.blockchain_key, this.blockchain_iv);
+            if (curr_block.transaction.text !== "Genesis") {
+                curr_block.decryptData(this.blockchain_key, this.blockchain_iv);
+            }
+            else {
+                return undefined;
+            }
             if (((_b = (_a = curr_block.transaction) === null || _a === void 0 ? void 0 : _a.patientInfo) === null || _b === void 0 ? void 0 : _b.id) == Id || ((_d = (_c = curr_block.transaction) === null || _c === void 0 ? void 0 : _c.visit) === null || _d === void 0 ? void 0 : _d.patientId) == Id) {
                 curr_block.encryptData(this.blockchain_key, this.blockchain_iv);
                 return curr_block.transaction;
@@ -285,6 +304,30 @@ class blockchain {
             }
         }
         return undefined;
+    }
+    findAllPatientIds(wantedDoctor) {
+        var curr_block = this.lastBlock;
+        var allIds = [];
+        while (!!curr_block) {
+            let tmp = wantedDoctor.verify_signiture(curr_block.transaction.signiture, curr_block.transaction.getText());
+            if (curr_block.transaction.text !== "Genesis") {
+                curr_block.decryptData(this.blockchain_key, this.blockchain_iv);
+            }
+            else {
+                return allIds;
+            }
+            if (!!curr_block.transaction.patientInfo) {
+                //doctor1.verify_signiture(test.lastBlock.transaction?.signiture, test.lastBlock.transaction.getText())
+                if (!!curr_block.transaction.patientInfo.id) {
+                    let patientID = curr_block.transaction.patientInfo.id;
+                    if (tmp === 1)
+                        allIds.push(patientID);
+                }
+            }
+            curr_block.encryptData(this.blockchain_key, this.blockchain_iv);
+            curr_block = curr_block.previousBlock;
+        }
+        return allIds;
     }
     addVisitBlock(docPrivateKey, Transa) {
         // const preTrans: Transaction | undefined = this.findTransWithId(Transa.patientId);
@@ -302,6 +345,9 @@ class blockchain {
         var newTransaction = undefined;
         if (!!preTrans) {
             newTransaction = new Transaction(preTrans.signiture, preTrans.text, preTrans.visit, preTrans.patientInfo, preTrans.prevTransa);
+        }
+        else {
+            console.log("didnt find patinent, please check ID");
         }
         const curr_Transaction = new Transaction("0000", undefined, Transa, undefined, newTransaction);
         this.lastBlock = new Block(curr_Transaction, this.lastBlock.hash, this.lastBlock);
@@ -329,6 +375,28 @@ class blockchain {
             console.log("previous Hash: " + curr_block.prevHash + ", Transaction: " + curr_block.transaction);
             curr_block = curr_block.previousBlock;
             console.log("________________________");
+        }
+    }
+    printAllDoctors() {
+        var curr_Doctor;
+        for (let i = 0; i < test.doctors.length; i++) {
+            curr_Doctor = test.doctors[i];
+            console.log(curr_Doctor.stringForPrinting());
+        }
+    }
+    printDecryptedChain() {
+        var curr_block = this.lastBlock;
+        while (!!curr_block) {
+            if (curr_block.transaction.text !== "Genesis") {
+                console.log(curr_block.transaction.decryptData(this.blockchain_key, this.blockchain_iv));
+                curr_block.transaction.encryptData(this.blockchain_key, this.blockchain_iv);
+                curr_block = curr_block.previousBlock;
+                console.log("________________________");
+            }
+            else {
+                console.log(curr_block);
+                curr_block = curr_block.previousBlock;
+            }
         }
     }
     checkIntegrity() {
@@ -369,29 +437,22 @@ class blockchain {
             newTransaction.encryptData(this.blockchain_key, this.blockchain_iv);
         }
     }
+    getAllPatients(wantedDoctor) {
+        const allPatientsBlocks = this.findAllPatientIds(wantedDoctor);
+        if (allPatientsBlocks.length === 0) {
+            console.log("There were no patients created by this doctor");
+        }
+        else {
+            for (let i = 0; i < test.patients.length; i++) {
+                let currPatient = test.patients[i];
+                if (!!currPatient.id && allPatientsBlocks.includes(currPatient.id)) {
+                    console.log(currPatient.toString());
+                }
+            }
+        }
+    }
 }
 exports.blockchain = blockchain;
-let visit1 = new visitInfo(0, new Date("2019-01-16"), "D1", "lab", "dead");
-let visit2 = new visitInfo(1, new Date("2019-01-17"), "D1", "lab", "almost dead");
-let visit3 = new visitInfo(1, new Date("2019-01-17"), "D1", "lab", "almost dead");
-//console.log(randomBytes(32).toString());
-let test = new blockchain();
-let doctor1 = test.addDoctor("D1", 56, "12345");
-let doctor2 = test.addDoctor("D2", 56, "12345");
-test.addPatient(doctor1.privateKey, "P1", 27, gender["male"], bloodType["A"], 77, 170, 170, 180, 12);
-test.addVisitBlock(doctor1.privateKey, visit1);
-test.addPatient(doctor1.privateKey, "P2", 27, gender["male"], bloodType["A"], 77, 170, 170, 180, 12);
-test.addVisitBlock(doctor1.privateKey, visit2);
-test.addVisitBlock(doctor1.privateKey, visit3);
-//console.log("Decrypted Block")
-//test.lastBlock.decryptData(test.blockchain_key, test.blockchain_iv)
-//test.traverseChain();
-// doctor1.verify_signiture(test.lastBlock.transaction?.signiture, test.lastBlock.transaction.getText())
-// doctor2.verify_signiture(test.lastBlock.transaction?.signiture, test.lastBlock.transaction.getText())
-// let block = test.lastBlock.previousBlock
-// test.checkIntegrity()
-// test.getAllTransactions(1)
-// test.traverseChain();
 let currUserName = "";
 let currLoggedInDoctor = undefined;
 function logIn() {
@@ -399,8 +460,8 @@ function logIn() {
         input: process_1.stdin,
         output: process_1.stdout
     });
-    rl.question("Please Enter Your User Name \n", function (answer) {
-        console.log(`Oh, so your name is ${answer}`);
+    rl.question("Please Enter Your User Name\n", function (answer) {
+        //console.log(`Oh, so your name is ${answer}`);
         rl.close();
         if (answer === "end") {
             console.log("Closing the interface");
@@ -423,7 +484,7 @@ function logIn() {
                     output: process_1.stdout
                 });
                 r2.question("Enter Your Password \n", function (answer) {
-                    console.log(`Oh, so your name is ${answer}`);
+                    //console.log(`Oh, so your name is ${answer}`);
                     r2.close();
                     if (!!currLoggedInDoctor) {
                         if (answer === currLoggedInDoctor.password) {
@@ -457,7 +518,6 @@ function addPatient() {
         console.log(`Oh, so your name is ${answer}`);
         let input = answer.split(",");
         if (!!currLoggedInDoctor) {
-            // gender["male"],bloodType["A"]
             let gen = gender["male"];
             if (input[2].trim() === "male") {
                 gen = gender["male"];
@@ -479,11 +539,11 @@ function addPatient() {
                 blood = bloodType["X"];
             }
             test.addPatient(currLoggedInDoctor === null || currLoggedInDoctor === void 0 ? void 0 : currLoggedInDoctor.privateKey, input[0].trim(), parseInt(input[1].trim()), gen, blood, parseInt(input[4].trim()), parseInt(input[5].trim()), parseInt(input[6].trim()), parseInt(input[7].trim()), parseInt(input[8].trim()));
-            test.lastBlock.decryptData(test.blockchain_key, test.blockchain_iv);
-            console.log(test.traverseChain());
+            // test.lastBlock.decryptData(test.blockchain_key, test.blockchain_iv)
+            // console.log(test.traverseChain())
         }
         else {
-            console.log("Not Logged In Baka");
+            console.log("Not Logged In");
             return;
         }
         rl.close();
@@ -493,6 +553,133 @@ function addPatient() {
         }
         else {
             insideInterface();
+        }
+    });
+}
+function addVisit() {
+    const rl = readline.createInterface({
+        input: process_1.stdin,
+        output: process_1.stdout
+    });
+    rl.question("Please Add The data of the visit in the following format: \n Patient ID, Doctor Name, Reason Of Visit, prescription\n", function (answer) {
+        console.log(`Oh, so your name is ${answer}`);
+        let input = answer.split(",");
+        if (!!currLoggedInDoctor) {
+            let tempVisit = new visitInfo(parseInt(input[0].trim()), new Date(), input[1].trim(), input[2].trim(), input[3].trim());
+            console.log(tempVisit);
+            test.addVisitBlock(currLoggedInDoctor.privateKey, tempVisit);
+            // test.lastBlock.decryptData(test.blockchain_key, test.blockchain_iv)
+            // console.log(test.traverseChain())
+        }
+        else {
+            console.log("Not Logged In");
+            return;
+        }
+        rl.close();
+        if (answer === "end") {
+            console.log("Closing the interface");
+            return;
+        }
+        else {
+            insideInterface();
+        }
+    });
+}
+function addNewDoctor() {
+    const rl = readline.createInterface({
+        input: process_1.stdin,
+        output: process_1.stdout
+    });
+    //addDoctor(name: string, age: number, password: string)
+    rl.question("Please Add The data of the new Doctor in the following format: \nDoctor Name, Age, Password\n", function (answer) {
+        console.log(`Oh, so your name is ${answer}`);
+        let input = answer.split(",");
+        if (!!currLoggedInDoctor) {
+            test.addDoctor(input[0].trim(), parseInt(input[1].trim()), input[2].trim());
+        }
+        else {
+            console.log("Not Logged In");
+            return;
+        }
+        rl.close();
+        if (answer === "end") {
+            console.log("Closing the interface");
+            return;
+        }
+        else {
+            insideInterface();
+        }
+    });
+}
+function viewPatientVisits() {
+    const rl = readline.createInterface({
+        input: process_1.stdin,
+        output: process_1.stdout
+    });
+    //addDoctor(name: string, age: number, password: string)
+    rl.question("Please Enter The Patient Id You want to view the data of\n", function (answer) {
+        //console.log(`Oh, so your name is ${answer}`);
+        if (!!currLoggedInDoctor) {
+        }
+        else {
+            console.log("Not Logged In");
+            return;
+        }
+        rl.close();
+        if (answer === "end") {
+            console.log("Closing the interface");
+            return;
+        }
+        else {
+            test.getAllTransactions(parseInt(answer.trim()));
+            insideInterface();
+        }
+    });
+}
+function viewPatientsOfDoctor() {
+    const rl = readline.createInterface({
+        input: process_1.stdin,
+        output: process_1.stdout
+    });
+    //addDoctor(name: string, age: number, password: string)
+    rl.question("Please Enter The Doctor Name You want to view the Patients of\n", function (answer) {
+        //console.log(`Oh, so your name is ${answer}`);
+        if (!!currLoggedInDoctor) {
+        }
+        else {
+            console.log("Not Logged In");
+            return;
+        }
+        rl.close();
+        if (answer === "end") {
+            console.log("Closing the interface");
+            return;
+        }
+        else {
+            //doctor1.verify_signiture(test.lastBlock.transaction?.signiture, test.lastBlock.transaction.getText())
+            let wantedDoctor = undefined;
+            let flag = false;
+            for (let i = 0; i < test.doctors.length; i++) {
+                let currName = test.doctors[i].name;
+                if (answer === currName) {
+                    wantedDoctor = test.doctors[i];
+                    flag = true;
+                    break;
+                }
+            }
+            if (!!wantedDoctor) {
+                console.log(`These are the patients that where added by ` + wantedDoctor.name + ":-");
+                console.log();
+                test.getAllPatients(wantedDoctor);
+                console.log();
+                insideInterface();
+            }
+            else {
+                console.log();
+                console.log("There was no doctor with the name: " + answer);
+                console.log();
+                insideInterface();
+            }
         }
     });
 }
@@ -502,8 +689,13 @@ function insideInterface() {
         input: process_1.stdin,
         output: process_1.stdout
     });
-    rl.question("What is your name? \n", function (answer) {
-        console.log(`Oh, so your name is ${answer}`);
+    let quest = "Please Enter Funtion\nEnter \"end\" to" +
+        " Exit, \n \"viewDoctors\" to view a all Doctors registered on the system," +
+        " \n \"viewPatients\" to view a all patients on the system, \n \"addPatient\" to add a new patient, \n \"addVisit\" to" +
+        " add a new visit, \n \"showEncryptedChain\" to print the Encrypted chain," +
+        " \n \"showDecryptedChain\" to print the Decrypted chain, \n \"addNewDoctor\" to add a new doctor, \n \"viewPatientVisits\" to" +
+        " view all transactions related to a patient\n\n";
+    rl.question(quest, function (answer) {
         rl.close();
         if (answer === "end") {
             console.log("Closing the interface");
@@ -513,37 +705,121 @@ function insideInterface() {
             addPatient();
             return;
         }
+        else if (answer === "viewPatients") {
+            console.log(test.patients);
+            insideInterface();
+        }
+        else if (answer === "viewDoctors") {
+            test.printAllDoctors();
+            insideInterface();
+        }
+        else if (answer === "addVisit") {
+            addVisit();
+            return;
+        }
+        else if (answer === "showEncryptedChain") {
+            test.traverseChain();
+            insideInterface();
+        }
+        else if (answer === "showDecryptedChain") {
+            test.printDecryptedChain();
+            insideInterface();
+        }
+        else if (answer === "addNewDoctor") {
+            addNewDoctor();
+            return;
+        }
+        else if (answer === "viewPatientVisits") {
+            viewPatientVisits();
+            return;
+        }
+        else if (answer === "viewPatientsOfDoctor") {
+            viewPatientsOfDoctor();
+            return;
+        }
         else {
             insideInterface();
         }
     });
 }
-function startInterface() {
-    console.log("Welcome To Our Block Chain System :)");
+function createAccount() {
     const rl = readline.createInterface({
         input: process_1.stdin,
         output: process_1.stdout
     });
-    rl.question("Want To Login Or Create Account \n", function (answer) {
+    rl.question("Please Enter Your Wanted User Name and age in the following format:  \n username, age \n", function (answer) {
         console.log(`Oh, so your name is ${answer}`);
         rl.close();
         if (answer === "end") {
             console.log("Closing the interface");
             return;
         }
-        else if (answer === "Login") {
-            logIn();
-        }
-        else if (answer === "Create") {
-            console.log("Creating Account -- Not Yet Developed");
-            return;
-        }
         else {
-            console.log("Please Enter A Valid Input Dumbass :)");
-            startInterface();
+            let input = answer.split(",");
+            let username = input[0].trim();
+            let age = parseInt(input[1].trim());
+            const r2 = readline.createInterface({
+                input: process_1.stdin,
+                output: process_1.stdout
+            });
+            r2.question("Enter Your Wanted Password \n", function (answer) {
+                console.log(`Oh, so your name is ${answer}`);
+                r2.close();
+                let doctorTmp = test.addDoctor(username, age, answer);
+                currLoggedInDoctor = doctorTmp;
+                console.log("Account Created Successfully and User Is Logged In");
+                insideInterface();
+            });
         }
     });
 }
+function startInterface() {
+    console.log("Welcome To Our Block Chain System :)");
+    // const rl = readline.createInterface({
+    //   input: stdin,
+    //   output: stdout
+    // });
+    logIn();
+    // rl.question("Want To Login Or Create Account \n", function (answer: string) {
+    //   console.log(`Oh, so your name is ${answer}`);
+    //   rl.close();
+    //   if(answer === "end"){
+    //     console.log("Closing the interface");
+    //     return
+    //   }
+    //   else if(answer === "Login"){
+    //     logIn()
+    //   }
+    //   else if(answer === "Create"){
+    //     createAccount()
+    //   }
+    //   else{
+    //     console.log("Please Enter A Valid Input");
+    //     startInterface()
+    //   }
+    // });
+}
+let visit1 = new visitInfo(0, new Date("2019-01-16"), "D1", "lab", "dead");
+let visit2 = new visitInfo(1, new Date("2019-01-17"), "D1", "lab", "almost dead");
+let visit3 = new visitInfo(1, new Date("2019-01-17"), "D1", "lab", "almost dead");
+//console.log(randomBytes(32).toString());
+let test = new blockchain();
+let doctor1 = test.addDoctor("D1", 56, "12345");
+let doctor2 = test.addDoctor("D2", 56, "12345");
+test.addPatient(doctor1.privateKey, "P1", 27, gender["male"], bloodType["A"], 77, 170, 170, 180, 12);
+// test.addVisitBlock(doctor1.privateKey, visit1);
+test.addPatient(doctor1.privateKey, "P2", 27, gender["male"], bloodType["A"], 77, 170, 170, 180, 12);
+// test.addVisitBlock(doctor1.privateKey, visit2);
+// test.addVisitBlock(doctor1.privateKey, visit3);
+//console.log("Decrypted Block")
+//test.lastBlock.decryptData(test.blockchain_key, test.blockchain_iv)
+//test.traverseChain();
+// doctor1.verify_signiture(test.lastBlock.transaction?.signiture, test.lastBlock.transaction.getText())
+// doctor2.verify_signiture(test.lastBlock.transaction?.signiture, test.lastBlock.transaction.getText())
+// let block = test.lastBlock.previousBlock
+// test.checkIntegrity()
+// test.getAllTransactions(1)
+// test.traverseChain();
 startInterface();
 // test.addBlock("second block ever");
 // test.addBlock("Third block ever")
