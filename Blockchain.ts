@@ -108,7 +108,6 @@ export class Doctor{
       //const signature_buffer = Buffer.from(signature, "utf-8");
       const signature:Buffer = Buffer.from(sign, "hex")
       const doctor_PK = this.publicKey
-      const doctor_name = this.name
       const verify = crypto.createVerify('SHA256');
       verify.update(transaction);
 
@@ -282,6 +281,7 @@ export class blockchain{
   public blockchain_iv
 
   public lastBlock: Block;
+  private lastBlockHash: string;
   public doctors: Doctor[];
   public patients: personalInfo[]; 
 
@@ -300,6 +300,7 @@ export class blockchain{
       const signature = sign.sign(privateKey); 
       const Genesis_Transaction = new Transaction(signature.toString("hex"), text);
       this.lastBlock = new Block(Genesis_Transaction, "0000", undefined)
+      this.lastBlockHash = this.lastBlock.hash
       this.doctors = [];
       this.patients = [];
       this.blockchain_key = randomBytes(32);
@@ -327,6 +328,8 @@ export class blockchain{
   }
 
   addPatient(docPrivateKey: string, name: string, age: number, gender: gender, bloodType: bloodType, weight: number, height: number, bloodPressure: number, pulse: number, oxygen: number){
+      // we can add check if patient exists or not
+    
       const newPatient = new personalInfo(this.patients.length, name, age, gender, bloodType, weight, height, bloodPressure, pulse, oxygen);
       this.patients.push(newPatient);
       this.addPatientBlock(docPrivateKey, newPatient);
@@ -341,7 +344,7 @@ export class blockchain{
     }
     const curr_doctor = new Doctor(this.doctors.length, name, age, password)
     this.doctors.push(curr_doctor);
-    console.log(this.doctors)
+    // console.log(this.doctors)
     return curr_doctor
   }
 
@@ -349,7 +352,7 @@ export class blockchain{
     var curr_block: Block | undefined = this.lastBlock;
       while(!!curr_block){
         if(curr_block.transaction.text !== "Genesis"){
-        curr_block.decryptData(this.blockchain_key, this.blockchain_iv)
+          curr_block.decryptData(this.blockchain_key, this.blockchain_iv)
         }
         else{
           return undefined
@@ -393,7 +396,6 @@ export class blockchain{
           if(tmp === 1)
             allIds.push(patientID)
         }
-
       }
 
       curr_block.encryptData(this.blockchain_key, this.blockchain_iv)
@@ -405,18 +407,6 @@ export class blockchain{
   }
 
   addVisitBlock(docPrivateKey: string, Transa: visitInfo){
-    // const preTrans: Transaction | undefined = this.findTransWithId(Transa.patientId);
-    // const sign = crypto.createSign('SHA256');
-    // sign.update(Transa.toString()).end();
-    // const signature = sign.sign(docPrivateKey); 
-
-    
-
-    // const curr_Transaction = new Transaction(signature.toString("hex"), undefined, Transa, preTrans);
-    // const str = JSON.stringify(this.lastBlock);
-    // const hash = crypto.createHash('SHA256');
-    // const curr = hash.update(str).end();
-
 
     // we mine here
     let nonce = Math.round(Math.random() * 999999999);
@@ -429,7 +419,7 @@ export class blockchain{
       newTransaction = new Transaction(preTrans.signiture, preTrans.text, preTrans.visit, preTrans.patientInfo, preTrans.prevTransa)
     }
     else{
-      console.log("didnt find patinent, please check ID")
+      console.log("didnt find patient, please check ID")
     }
 
     const curr_Transaction = new Transaction("0000", undefined, Transa, undefined, newTransaction);
@@ -446,6 +436,7 @@ export class blockchain{
 
     this.lastBlock.transaction.signiture = signature.toString("hex")
 
+    this.lastBlockHash = this.lastBlock.hash
   }
 
   addPatientBlock(docPrivateKey: string, Transa: personalInfo){
@@ -467,6 +458,7 @@ export class blockchain{
 
     this.lastBlock.transaction.signiture = signature.toString("hex")
 
+    this.lastBlockHash = this.lastBlock.hash
   }
 
   traverseChain(){
@@ -485,7 +477,7 @@ export class blockchain{
 
       console.log(curr_Doctor.stringForPrinting())
     }
-}
+  }
 
   printDecryptedChain(){
     var curr_block: Block | undefined = this.lastBlock;
@@ -502,6 +494,7 @@ export class blockchain{
       }
     }
   }
+
   checkIntegrity(){
     var curr_block: Block | undefined = this.lastBlock;
 
@@ -523,11 +516,15 @@ export class blockchain{
     }
 
     if(integrityKept === true){
-      console.log("Integrity Kept In All Blocks")
+      if(this.lastBlock.hash === this.lastBlockHash)
+        console.log("Integrity Kept In All Blocks")
+      else
+        console.log("A Block Has Been Compromised")
     }
     else{
       console.log("A Block Has Been Compromised")
     }
+    
   }
 
   getAllTransactions(patientId:number){
@@ -633,7 +630,7 @@ function logIn() {
             }
           }
           else{
-            console.log("No User Name Enteed Before");
+            console.log("No User Name Entered Before");
             return
           }
         });
@@ -714,13 +711,13 @@ function addVisit() {
     output: stdout
   });
   
-  rl.question("Please Add The data of the visit in the following format: \n Patient ID, Doctor Name, Reason Of Visit, prescription\n", function (answer: string) {
+  rl.question("Please Add The data of the visit in the following format: \n Patient ID, Reason Of Visit, prescription\n", function (answer: string) {
     console.log(`Oh, so your name is ${answer}`);
     
     let input = answer.split(",")
 
     if(!!currLoggedInDoctor){
-      let tempVisit = new visitInfo(parseInt(input[0].trim()), new Date(), input[1].trim(), input[2].trim(), input[3].trim())
+      let tempVisit = new visitInfo(parseInt(input[0].trim()), new Date(), currLoggedInDoctor.name, input[1].trim(), input[2].trim())
       console.log(tempVisit)
       test.addVisitBlock(currLoggedInDoctor.privateKey, tempVisit)
 
@@ -870,12 +867,15 @@ function insideInterface() {
     output: stdout
   });
   
-  let quest = "Please Enter Funtion\nEnter \"end\" to" + 
+  let quest = "Please Enter Funtion\n Enter \"end\" to" + 
   " Exit, \n \"viewDoctors\" to view a all Doctors registered on the system," + 
   " \n \"viewPatients\" to view a all patients on the system, \n \"addPatient\" to add a new patient, \n \"addVisit\" to"+
   " add a new visit, \n \"showEncryptedChain\" to print the Encrypted chain," + 
   " \n \"showDecryptedChain\" to print the Decrypted chain, \n \"addNewDoctor\" to add a new doctor, \n \"viewPatientVisits\" to" +
-  " view all transactions related to a patient\n\n"
+  " view all transactions related to a patient\n \"addNewDoctor\" to add a new doctor, \n \"viewPatientsOfDoctor\" to" +
+  " view all patients that where created by a certain doctor, \n \"checkIntegrityOfAllBlocks\" to" +
+  " check that the integrity of all blocks in the block chain is kept, \n \"verifyLastBlock\" to" +
+  " verify that the last added block was added by the current logged in doctor\n\n"
   
 
   rl.question(quest,function (answer: string) {
@@ -925,6 +925,24 @@ function insideInterface() {
     else if(answer === "checkIntegrityOfAllBlocks"){
       console.log()
       test.checkIntegrity()
+      console.log()
+
+      insideInterface()
+    }
+    else if(answer === "verifyLastBlock"){
+      console.log()
+      if(!!currLoggedInDoctor){
+        let tmp = currLoggedInDoctor.verify_signiture(test.lastBlock.transaction?.signiture, test.lastBlock.transaction.getText())
+        if(tmp === 0){
+          console.log("this is not a valid signature")
+        }
+        else if (tmp === 1) {
+          console.log(`doctor ${currLoggedInDoctor.name} signed this block`)
+        }
+        else{
+          console.log("this doctor did not sign this block")
+        }
+      }
       console.log()
 
       insideInterface()
@@ -986,41 +1004,16 @@ function createAccount() {
 }
 
 function startInterface() {
-  console.log("Welcome To Our Block Chain System :)")
-  // const rl = readline.createInterface({
-  //   input: stdin,
-  //   output: stdout
-  // });
+  console.log("Welcome To Our EHR System :)")
+  console.log()
   
   logIn()
-  // rl.question("Want To Login Or Create Account \n", function (answer: string) {
-  //   console.log(`Oh, so your name is ${answer}`);
-    
-  //   rl.close();
-  
-  //   if(answer === "end"){
-  //     console.log("Closing the interface");
-  //     return
-  //   }
-  //   else if(answer === "Login"){
-  //     logIn()
-  //   }
-  //   else if(answer === "Create"){
-  //     createAccount()
-  //   }
-  //   else{
-  //     console.log("Please Enter A Valid Input");
-  //     startInterface()
-  //   }
-  // });
 }
 
 
 let visit1 = new visitInfo(0,new Date("2019-01-16"), "D1","lab","dead");
 let visit2 = new visitInfo(1,new Date("2019-01-17"), "D1","lab","almost dead");
 let visit3 = new visitInfo(1,new Date("2019-01-17"), "D1","lab","almost dead");
-
-//console.log(randomBytes(32).toString());
 
 let test = new blockchain();
 let doctor1: Doctor = test.addDoctor("D1", 56,"12345");
@@ -1029,36 +1022,9 @@ let doctor2: Doctor = test.addDoctor("D2", 56,"12345");
 
 test.addPatient(doctor1.privateKey, "P1", 27, gender["male"],bloodType["A"],77,170,170,180,12);
 // test.addVisitBlock(doctor1.privateKey, visit1);
-test.addPatient(doctor1.privateKey, "P2", 27, gender["male"],bloodType["A"],77,170,170,180,12);
+test.addPatient(doctor2.privateKey, "P2", 27, gender["male"],bloodType["A"],77,170,170,180,12);
 // test.addVisitBlock(doctor1.privateKey, visit2);
 // test.addVisitBlock(doctor1.privateKey, visit3);
 
-
-//console.log("Decrypted Block")
-
-//test.lastBlock.decryptData(test.blockchain_key, test.blockchain_iv)
-//test.traverseChain();
-
-
-// doctor1.verify_signiture(test.lastBlock.transaction?.signiture, test.lastBlock.transaction.getText())
-// doctor2.verify_signiture(test.lastBlock.transaction?.signiture, test.lastBlock.transaction.getText())
-
-
-// let block = test.lastBlock.previousBlock
-
-// test.checkIntegrity()
-
-// test.getAllTransactions(1)
-
-// test.traverseChain();
-
 startInterface()
 
-
-
-
-
-// test.addBlock("second block ever");
-// test.addBlock("Third block ever")
-//test.traverseChain();
-//console.log(test.lastBlock.previousBlock?.prevHash);
